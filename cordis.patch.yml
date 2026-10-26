@@ -1,0 +1,39 @@
+# qq-sticker：宿主半身（HTTP 路由）+ MCP 工具行。
+# MCP 启动不写死绝对路径：用一段 -e 启动器在运行时定位包位置
+# （兼容 cwd 在 profile 目录、以及 DSH_HOME/profiles/{desktop,web} 两种情况），
+# 这样用户装完不需要跑任何 postinstall。
+- insert:
+    - id: qq-sticker
+      name: 'dsh-qq-sticker'
+      config: {}
+    - id: qq-sticker-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: qq-sticker
+        transport: stdio
+        command: node
+        args:
+          - '--input-type=module'
+          - '-e'
+          - |
+            import { existsSync } from 'node:fs';
+            import { join } from 'node:path';
+            import { homedir } from 'node:os';
+            import { pathToFileURL } from 'node:url';
+            const home = process.env.DSH_HOME || join(homedir(), '.dsh');
+            const roots = [
+              process.cwd(),
+              join(home, 'profiles', 'desktop'),
+              join(home, 'profiles', 'web')
+            ];
+            let hit = '';
+            for (const r of roots) {
+              const p = join(r, 'node_modules', 'dsh-qq-sticker', 'src', 'server.mjs');
+              if (existsSync(p)) { hit = p; break; }
+            }
+            if (!hit) {
+              console.error('[qq-sticker] 找不到 server.mjs：请把包装进 profile 的 node_modules');
+              process.exit(1);
+            }
+            await import(pathToFileURL(hit).href);
+        toolCallTimeoutMs: 60000
